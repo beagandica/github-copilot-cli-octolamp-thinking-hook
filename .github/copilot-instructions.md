@@ -10,18 +10,24 @@ There is no persistent service.
 `.github/hooks/wled-hooks.json` is the per-repository configuration: version 1,
 relative script paths, `cwd` set to `.github/hooks`, and a 15-second hook timeout.
 `install.ps1` and `install.sh` copy both controllers into the user's
-`~/.github/hooks/` directory and independently generate a global configuration
-with absolute script paths and `cwd` set to `.`. They do not generate it from the
-checked-in JSON. Hooks are loaded at session start; installation or configuration
-changes require restarting Copilot CLI.
+`~/.copilot/hooks/` directory (or `$COPILOT_HOME/hooks/` when set) and independently
+generate a global configuration with absolute script paths and `cwd` set to `.`.
+They persist explicitly supplied `WLED_*` settings in each hook's `env` block;
+PowerShell also persists `-WledInterface`. They do not generate the configuration
+from the checked-in JSON. Hooks are loaded at session start; installation or
+configuration changes require restarting Copilot CLI.
 
 Keep these event mappings synchronized in the checked-in JSON and both installers:
 
 | Event | Status | Lamp |
 | --- | --- | --- |
-| `sessionStart`, `Stop`, `sessionEnd` | `done` | Solid white |
+| `Stop`, `sessionEnd` | `done` | Solid white |
 | `userPromptSubmitted` | `busy` | Breathing green |
 | `errorOccurred` | `error` | Blinking red |
+
+Do not add a `sessionStart` lamp command. The CLI can run it concurrently with
+the first `userPromptSubmitted` hook, allowing a late idle reset to overwrite
+the busy state. Opening or resuming a session leaves the lamp unchanged.
 
 ## Commands and validation
 
@@ -29,6 +35,9 @@ Run commands from the repository root. The Windows controller requires
 PowerShell 7+ (`pwsh`) because it uses the `??` operator.
 
 ```powershell
+# No-network lifecycle regression check (requires PowerShell 7 and Bash).
+pwsh -NoProfile -File .\tests\hook-lifecycle.ps1 -Bash "C:\Program Files\Git\bin\bash.exe"
+
 # Install globally on Windows (overwrites this integration's installed files).
 .\install.ps1
 
