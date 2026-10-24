@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "./wled-status.sh done",
+        "powershell": "& './wled-status.ps1' -Status 'done'",
+        "cwd": ".github/hooks",
+        "timeoutSec": 15
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "./wled-status.sh busy",
+        "powershell": "& './wled-status.ps1' -Status 'busy'",
+        "cwd": ".github/hooks",
+        "timeoutSec": 15
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "bash": "./wled-status.sh done",
+        "powershell": "& './wled-status.ps1' -Status 'done'",
+        "cwd": ".github/hooks",
+        "timeoutSec": 15
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "./wled-status.sh done",
+        "powershell": "& './wled-status.ps1' -Status 'done'",
+        "cwd": ".github/hooks",
+        "timeoutSec": 15
+      }
+    ],
+    "errorOccurred": [
+      {
+        "type": "command",
+        "bash": "./wled-status.sh error",
+        "powershell": "& './wled-status.ps1' -Status 'error'",
+        "cwd": ".github/hooks",
+        "timeoutSec": 15
+      }
+    ]
+  }
+}
