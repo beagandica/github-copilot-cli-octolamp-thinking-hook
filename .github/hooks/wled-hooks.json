@@ -1,15 +1,6 @@
 {
   "version": 1,
   "hooks": {
-    "sessionStart": [
-      {
-        "type": "command",
-        "bash": "./wled-status.sh done",
-        "powershell": "& './wled-status.ps1' -Status 'done'",
-        "cwd": ".github/hooks",
-        "timeoutSec": 15
-      }
-    ],
     "userPromptSubmitted": [
       {
         "type": "command",

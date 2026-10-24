@@ -2,7 +2,7 @@
 
 Turn your [WLED](https://kno.wled.ge/)-powered [Octolamp](https://github.com/martinwoodward/octolamp) into a real-time status light for [GitHub Copilot CLI](https://docs.github.com/copilot/concepts/agents/about-copilot-cli). When Copilot is thinking, the lamp breathes green. When it's idle, solid white. If something breaks, it blinks red.
 
-No model-level prompting tricks - this uses **Copilot CLI's native hooks system**, which fires at the system level with 100% reliability.
+No model-level prompting tricks - this uses **Copilot CLI's native hooks system**, which fires at session lifecycle events.
 
 <p align="center">
   <a href="https://github.com/martinwoodward/octolamp">
@@ -18,7 +18,7 @@ No model-level prompting tricks - this uses **Copilot CLI's native hooks system*
 |---|---|---|
 | **Thinking** | 🟢 Breathing green (Apple-style pulse) | `userPromptSubmitted` - you hit enter |
 | **Idle** | ⚪ Solid white | `Stop` - agent finishes responding |
-| **Session start** | ⚪ Solid white | `sessionStart` - clean baseline on launch |
+| **Session end** | ⚪ Solid white | `sessionEnd` - session closes |
 | **Error** | 🔴 Blinking red | `errorOccurred` - something broke |
 
 ### Key Features
@@ -72,6 +72,7 @@ If your WLED device runs in Access Point mode (the default), you'll want a **ded
 - [GitHub Copilot CLI](https://docs.github.com/copilot/concepts/agents/about-copilot-cli) installed and authenticated
 - A WLED device on the network (see [Shopping List](#-shopping-list) above)
 - `curl` available in your terminal (included on Windows 10+, macOS, and most Linux distros)
+- Windows: PowerShell 7+ (`pwsh`) installed and available in your PATH
 
 ### Step 1: Flash WLED
 
@@ -80,6 +81,7 @@ Plug your ESP8266/ESP32 into USB and visit the [WLED web installer](https://inst
 ### Step 2: Connect to the WLED Network
 
 Connect your computer (or a dedicated USB WiFi adapter) to the **WLED-AP** network.
+For a dedicated Windows adapter, follow the [one-time setup](#-dedicated-wifi-adapter-setup-windows) below before connecting, so it cannot take over your internet route.
 
 ### Step 3: Install the Hooks
 
@@ -87,19 +89,21 @@ Choose one of the two installation methods:
 
 #### Method A: Global Install (Recommended)
 
-Installs hooks to `~/.github/hooks/` so they work from any directory.
+Installs hooks to `~/.copilot/hooks/` (`%USERPROFILE%\.copilot\hooks\` on Windows) so they work from any directory. If `COPILOT_HOME` is set, installs to its `hooks` subdirectory instead.
 
 **Windows (PowerShell):**
 ```powershell
 git clone https://github.com/beagandica/github-copilot-cli-octolamp-thinking-hook.git
-cd copilot-cli-octolamp-thinking-hook
+cd github-copilot-cli-octolamp-thinking-hook
 .\install.ps1
+# For a dedicated USB WiFi adapter, use this instead:
+# .\install.ps1 -WledInterface "Wi-Fi 2"
 ```
 
 **macOS / Linux:**
 ```bash
 git clone https://github.com/beagandica/github-copilot-cli-octolamp-thinking-hook.git
-cd copilot-cli-octolamp-thinking-hook
+cd github-copilot-cli-octolamp-thinking-hook
 chmod +x install.sh
 ./install.sh
 ```
@@ -117,13 +121,14 @@ The hooks JSON uses relative paths, so it works out of the box.
 
 ### Step 4: Restart Copilot CLI
 
-Hooks are discovered at session start. Restart Copilot CLI (or start a new session) and submit a prompt - your lamp should breathe green while thinking, then return to white.
+Restart the Copilot CLI process after installation so it reloads the hooks, then submit a prompt - your lamp should breathe green while thinking, then return to white.
 
 ---
 
 ## ⚙️ Configuration
 
 All settings are controlled via environment variables - no code changes needed.
+The global installers save any `WLED_*` settings below that are set at installation time into each hook's `env` block. Windows also saves the adapter supplied with `-WledInterface`. These saved settings override inherited environment variables; change them by rerunning the installer, then restart Copilot CLI. Unset settings use the controller defaults or the environment inherited at runtime.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -136,10 +141,12 @@ All settings are controlled via environment variables - no code changes needed.
 
 ```powershell
 $env:WLED_HOST = "192.168.1.42"
+.\install.ps1
 ```
 
 ```bash
 export WLED_HOST="192.168.1.42"
+bash install.sh
 ```
 
 ### Dedicated Adapter Setup (WLED in AP mode)
@@ -148,15 +155,17 @@ export WLED_HOST="192.168.1.42"
 $env:WLED_INTERFACE = "Wi-Fi 2"
 $env:WLED_SSID = "WLED-AP"
 $env:WLED_HOST = "4.3.2.1"
+.\install.ps1
 ```
 
 ```bash
 export WLED_INTERFACE="wlan1"
 export WLED_SSID="WLED-AP"
 export WLED_HOST="4.3.2.1"
+bash install.sh
 ```
 
-> **Tip:** Add these to your PowerShell profile (`$PROFILE`) or `.bashrc`/`.zshrc` so they persist.
+> **Tip:** Installed hooks retain these settings across sessions without modifying your shell profile. Adapter names are local configuration, not hardcoded into the controllers.
 
 ---
 
@@ -171,15 +180,17 @@ When the USB adapter connects to WLED-AP, the ESP8266's DHCP server assigns a de
 ### One-Time Configuration (Run as Administrator)
 
 ```powershell
-# 1. Connect to WLED-AP the first time (password: wled1234)
-netsh wlan connect name="WLED-AP" interface="Wi-Fi 2"
-
-# 2. Set a static IP with NO gateway - the Octolamp is directly on the subnet
+# 1. Before connecting, set a static IP with NO gateway
 netsh interface ip set address "Wi-Fi 2" static 4.3.2.100 255.255.255.0 none
 
-# 3. Disable DAD - ESP8266 doesn't respond to ARP probes, causing the IP
+# 2. Disable DAD - ESP8266 doesn't respond to ARP probes, causing the IP
 #    to get stuck in "Tentative" state without this
 netsh interface ip set interface "Wi-Fi 2" dadtransmits=0
+
+# 3. In the Windows WiFi menu, select the USB adapter (Wi-Fi 2) and save
+#    WLED-AP with password wled1234. Leave the main Wi-Fi adapter connected
+#    to your regular network. Once the profile is saved:
+netsh wlan connect name="WLED-AP" interface="Wi-Fi 2"
 
 # 4. Auto-connect when the adapter is plugged in
 netsh wlan set profileparameter name="WLED-AP" connectionmode=auto interface="Wi-Fi 2"
@@ -269,7 +280,7 @@ Here's what I need you to do:
      b. netsh interface ip set interface "<adapter>" dadtransmits=0
      c. netsh wlan set profileparameter name="WLED-AP" connectionmode=auto interface="<adapter>"
      d. Disable USB Selective Suspend via powercfg
-   - Add the env vars to my PowerShell profile
+   - Re-run the installer with those env vars set so they are saved in the global hooks
 
 5. Test the connection:
    - Verify the WLED device responds at the configured host
@@ -293,11 +304,12 @@ The hook configuration maps lifecycle events to the status scripts:
 
 - **`userPromptSubmitted`** → fires when you press enter → 🟢 breathing green
 - **`Stop`** → fires when the agent finishes responding → ⚪ solid white
-- **`sessionStart`** → fires when a session begins or resumes → ⚪ solid white
 - **`sessionEnd`** → fires when the session closes → ⚪ solid white
 - **`errorOccurred`** → fires on any agent error → 🔴 blinking red
 
 Hooks receive JSON input via stdin. The status scripts drain this input and ignore it - they only care about which status to set.
+
+There is deliberately no `sessionStart` lamp command. Copilot CLI can run it concurrently with `userPromptSubmitted` on the first prompt; a startup white reset can arrive after green and hide the thinking state. Opening or resuming a session leaves the lamp unchanged until a prompt or completion event.
 
 ---
 
@@ -305,7 +317,7 @@ Hooks receive JSON input via stdin. The status scripts drain this input and igno
 
 ### Hooks aren't firing
 
-- Hooks must be in `.github/hooks/` - either in your repo root or `~/.github/hooks/` for global hooks
+- Repository hooks go in `.github/hooks/`; global hooks go in `~/.copilot/hooks/` (or `$COPILOT_HOME/hooks/` when set)
 - Check that the JSON has `"version": 1`
 - **Restart Copilot CLI** after installing hooks (they're discovered at session start)
 
@@ -314,6 +326,7 @@ Hooks receive JSON input via stdin. The status scripts drain this input and igno
 - Verify your WLED device is reachable: `curl -s http://4.3.2.1/json/state`
 - If using a dedicated adapter, check it's connected: `Get-NetAdapter -Name "Wi-Fi 2"`
 - Test the script directly: `.\wled-status.ps1 -Status "busy"` or `./wled-status.sh busy`
+- If only the first prompt stays white, reinstall the latest hooks and restart that CLI process. Remove any older WLED `sessionStart` reset from repository or user hooks; all sources run together.
 
 ### Adapter keeps disconnecting (Windows)
 
@@ -357,11 +370,19 @@ github-copilot-cli-octolamp-thinking-hook/
 │       ├── wled-hooks.json      ← Copilot CLI hook configuration
 │       ├── wled-status.ps1      ← Windows (PowerShell) status controller
 │       └── wled-status.sh       ← macOS/Linux (Bash) status controller
+├── tests/
+│   └── hook-lifecycle.ps1       ← No-network lifecycle regression check
 ├── install.ps1                  ← Windows global install script
 ├── install.sh                   ← macOS/Linux global install script
 ├── LICENSE                      ← MIT License
 └── README.md                   ← You are here
 ```
+
+### Hook lifecycle regression check
+
+With PowerShell 7 and Bash installed, run `pwsh -NoProfile -File .\tests\hook-lifecycle.ps1` from the repository root. On Windows with Git for Windows, add `-Bash "C:\Program Files\Git\bin\bash.exe"`.
+
+This checks repository and generated global hooks against the first-prompt startup race and response completion. It mocks HTTP requests and installs only into temporary directories; it does not contact the lamp or change your global hooks.
 
 ---
 
