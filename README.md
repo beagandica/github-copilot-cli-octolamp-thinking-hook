@@ -12,6 +12,22 @@ No model-level prompting tricks - this uses **Copilot CLI's native hooks system*
 
 ---
 
+## 🎤 GitHub Universe 2026
+
+This is the companion repository for **[I made my Octolamp think with GitHub Copilot CLI hooks](https://reg.githubuniverse.com/flow/github/universe26/attendee-portal/page/sessioncatalog/session/1777614539199001PlmK)**.
+
+- **Speaker:** Bea Mendez Gandica, CEO/Founder, Nuevo Foundation
+- **When:** Wednesday, October 28, 2026, 11:20-11:35 AM PDT
+- **Where:** Ship & Tell @ Firehouse
+
+The idea grew out of the Octolamps handed out at GitHub Universe 2025: what if a lamp could show when Copilot CLI is working? This project connects native CLI lifecycle events to a physical light through the WLED API, making agent activity visible beyond the terminal.
+
+The session walks through the build, how Copilot CLI hooks work under the hood, and how to adapt the same approach to your own automations.
+
+**Try it yourself:** Follow the [Quick Start](#-quick-start), or explore [How Hooks Work](#-how-hooks-work). You can use any WLED-compatible light - not just an Octolamp.
+
+---
+
 ## ✨ What It Does
 
 | Status | Light Effect | Trigger |
@@ -59,7 +75,9 @@ If your WLED device runs in Access Point mode (the default), you'll want a **ded
 
 | Component | US Link | Notes |
 |---|---|---|
-| UGREEN AX900 USB WiFi 6 | [Amazon US](https://www.amazon.com/dp/B0DK14GTR2) | Recommended - compact, plug-and-play |
+| UGREEN AX900 USB WiFi 6 | [Amazon US](https://www.amazon.com/dp/B0DK14GTR2) | Compact; check platform compatibility below |
+
+> **Compatibility:** This specific UGREEN AX900 model does **not** support **Windows on ARM** or **macOS**, including Apple silicon Macs. Other options on the market support these platforms; choose an adapter with manufacturer-confirmed support for your exact OS version and processor architecture. This limitation applies to the linked adapter, not the cross-platform hooks.
 
 > **Not needed if** your WLED device is connected to your home/office WiFi network instead of running in AP mode.
 
