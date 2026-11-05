@@ -41,31 +41,28 @@ if ($WledInterface) {
 
 $hooks = @{
     version = 1
-    hooks   = @{
-        userPromptSubmitted   = @()
-        Stop                 = @()
-        sessionEnd           = @()
-        errorOccurred        = @()
-    }
+    hooks   = [ordered]@{}
 }
 
-$statuses = @{
-    userPromptSubmitted = "busy"
-    Stop               = "done"
-    sessionEnd         = "done"
-    errorOccurred      = "error"
+# Event name → status, plus an optional tool matcher.
+$statuses = [ordered]@{
+    userPromptSubmitted = @{ status = "busy" }
+    postToolUseFailure  = @{ status = "error" }
+    postToolUse         = @{ status = "tool"; matcher = "bash|powershell" }
+    Stop                = @{ status = "done" }
+    sessionEnd          = @{ status = "reset" }
+    errorOccurred       = @{ status = "error" }
 }
 
 foreach ($event in $statuses.Keys) {
-    $s = $statuses[$event]
-    $entry = @{
-        type       = "command"
-        bash       = "$shCommandPath $s"
-        powershell = "& $ps1CommandPath -Status '$s'"
-        cwd        = "."
-        env        = $hookEnv
-        timeoutSec = 15
-    }
+    $s = $statuses[$event].status
+    $entry = [ordered]@{ type = "command" }
+    if ($statuses[$event].matcher) { $entry.matcher = $statuses[$event].matcher }
+    $entry.bash       = "$shCommandPath $s"
+    $entry.powershell = "& $ps1CommandPath -Status '$s'"
+    $entry.cwd        = "."
+    $entry.env        = $hookEnv
+    $entry.timeoutSec = 15
     $hooks.hooks[$event] = @($entry)
 }
 

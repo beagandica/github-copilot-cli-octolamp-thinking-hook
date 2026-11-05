@@ -56,7 +56,7 @@ function Test-FirstPrompt($Config, [bool]$UseBash, [string]$Name) {
     # Reproduce a slow startup reset finishing after the first prompt.
     Invoke-TestHook $Config "sessionStart" $UseBash
     $state = Get-Content -LiteralPath $env:WLED_TEST_STATE -Raw | ConvertFrom-Json
-    if (-not $state.on -or $state.seg[0].fx -ne 2 -or ($state.seg[0].col[0] -join ",") -ne "0,255,0") {
+    if (-not $state.on -or $state.seg[0].fx -ne 9) {
         throw "${Name}: a late startup hook overwrote the first prompt's busy state."
     }
     Invoke-TestHook $Config "Stop" $UseBash

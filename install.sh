@@ -64,6 +64,27 @@ cat > "$HOOKS_DIR/wled-hooks.json" << EOF
         "timeoutSec": 15
       }
     ],
+    "postToolUseFailure": [
+      {
+        "type": "command",
+        "bash": "$SH_PATH error",
+        "powershell": "& '$PS1_PATH' -Status 'error'",
+        "cwd": ".",
+        "env": {$HOOK_ENV},
+        "timeoutSec": 15
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "matcher": "bash|powershell",
+        "bash": "$SH_PATH tool",
+        "powershell": "& '$PS1_PATH' -Status 'tool'",
+        "cwd": ".",
+        "env": {$HOOK_ENV},
+        "timeoutSec": 15
+      }
+    ],
     "Stop": [
       {
         "type": "command",
@@ -77,8 +98,8 @@ cat > "$HOOKS_DIR/wled-hooks.json" << EOF
     "sessionEnd": [
       {
         "type": "command",
-        "bash": "$SH_PATH done",
-        "powershell": "& '$PS1_PATH' -Status 'done'",
+        "bash": "$SH_PATH reset",
+        "powershell": "& '$PS1_PATH' -Status 'reset'",
         "cwd": ".",
         "env": {$HOOK_ENV},
         "timeoutSec": 15

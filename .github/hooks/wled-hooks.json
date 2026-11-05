@@ -10,6 +10,25 @@
         "timeoutSec": 15
       }
     ],
+    "postToolUseFailure": [
+      {
+        "type": "command",
+        "bash": "./wled-status.sh error",
+        "powershell": "& './wled-status.ps1' -Status 'error'",
+        "cwd": ".github/hooks",
+        "timeoutSec": 15
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "matcher": "bash|powershell",
+        "bash": "./wled-status.sh tool",
+        "powershell": "& './wled-status.ps1' -Status 'tool'",
+        "cwd": ".github/hooks",
+        "timeoutSec": 15
+      }
+    ],
     "Stop": [
       {
         "type": "command",
@@ -22,8 +41,8 @@
     "sessionEnd": [
       {
         "type": "command",
-        "bash": "./wled-status.sh done",
-        "powershell": "& './wled-status.ps1' -Status 'done'",
+        "bash": "./wled-status.sh reset",
+        "powershell": "& './wled-status.ps1' -Status 'reset'",
         "cwd": ".github/hooks",
         "timeoutSec": 15
       }

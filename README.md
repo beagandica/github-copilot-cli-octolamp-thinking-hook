@@ -1,6 +1,6 @@
 # 🐙💡 GitHub Copilot CLI Octolamp Thinking Hook
 
-Turn your [WLED](https://kno.wled.ge/)-powered [Octolamp](https://github.com/martinwoodward/octolamp) into a real-time status light for [GitHub Copilot CLI](https://docs.github.com/copilot/concepts/agents/about-copilot-cli). When Copilot is thinking, the lamp breathes green. When it's idle, solid white. If something breaks, it blinks red.
+Turn your [WLED](https://kno.wled.ge/)-powered [Octolamp](https://github.com/martinwoodward/octolamp) into a real-time status light for [GitHub Copilot CLI](https://docs.github.com/copilot/concepts/agents/about-copilot-cli). When Copilot is thinking, a rainbow spins around the lamp. When it's idle, solid white. If a command fails or something breaks, it blinks red until it's fixed.
 
 No model-level prompting tricks - this uses **Copilot CLI's native hooks system**, which fires at session lifecycle events.
 
@@ -32,10 +32,15 @@ The session walks through the build, how Copilot CLI hooks work under the hood, 
 
 | Status | Light Effect | Trigger |
 |---|---|---|
-| **Thinking** | 🟢 Breathing green (Apple-style pulse) | `userPromptSubmitted` - you hit enter |
-| **Idle** | ⚪ Solid white | `Stop` - agent finishes responding |
-| **Session end** | ⚪ Solid white | `sessionEnd` - session closes |
-| **Error** | 🔴 Blinking red | `errorOccurred` - something broke |
+| **Thinking** | 🌈 Rotating rainbow | `userPromptSubmitted` - you hit enter |
+| **Needs fixing** | 🔴 Blinking red (stays red) | `postToolUseFailure` - a tool or command failed |
+| **Error** | 🔴 Blinking red (stays red) | `errorOccurred` - Copilot itself hit an error |
+| **Command failed** | 🔴 Blinking red (stays red) | `postToolUse` - a `bash`/`powershell` command exited non-zero |
+| **Fixed** | 🌈 Back to rainbow | `postToolUse` - a later `bash`/`powershell` command succeeds |
+| **Idle** | ⚪ Solid white, or 🔴 if still broken | `Stop` - agent finishes responding |
+| **Session end** | ⚪ Solid white (clears red) | `sessionEnd` - session closes |
+
+Red is *sticky*: once something fails, `Stop` won't turn the lamp white. Red clears on your next prompt, when a later shell command succeeds, or when the session ends. The marker is a small file in your temp directory (`wled-octolamp-error-<host>`).
 
 ### Key Features
 
@@ -139,7 +144,7 @@ The hooks JSON uses relative paths, so it works out of the box.
 
 ### Step 4: Restart Copilot CLI
 
-Restart the Copilot CLI process after installation so it reloads the hooks, then submit a prompt - your lamp should breathe green while thinking, then return to white.
+Restart the Copilot CLI process after installation so it reloads the hooks, then submit a prompt - your lamp should show a rotating rainbow while thinking, then return to white.
 
 ---
 
@@ -320,10 +325,12 @@ After setup, tell me to restart Copilot CLI so the hooks load.
 
 The hook configuration maps lifecycle events to the status scripts:
 
-- **`userPromptSubmitted`** → fires when you press enter → 🟢 breathing green
-- **`Stop`** → fires when the agent finishes responding → ⚪ solid white
-- **`sessionEnd`** → fires when the session closes → ⚪ solid white
-- **`errorOccurred`** → fires on any agent error → 🔴 blinking red
+- **`userPromptSubmitted`** → fires when you press enter → 🌈 rotating rainbow
+- **`postToolUseFailure`** → fires when a tool fails → 🔴 blinking red (sticky)
+- **`postToolUse`** (matcher `bash|powershell`) → fires after every shell command → 🔴 if it exited non-zero, otherwise 🌈 back to rainbow (only if red was showing). Copilot CLI reports a non-zero exit as `resultType: "success"`, so the script checks `toolResult.toolTelemetry` (`shell_error_category: "command_nonzero_exit"` / `exit_code`) instead.
+- **`Stop`** → fires when the agent finishes responding → ⚪ solid white, unless red is showing
+- **`sessionEnd`** → fires when the session closes → ⚪ solid white, clears red
+- **`errorOccurred`** → fires on any agent error → 🔴 blinking red (sticky)
 
 Hooks receive JSON input via stdin. The status scripts drain this input and ignore it - they only care about which status to set.
 
@@ -410,10 +417,10 @@ The scripts communicate with WLED via its [JSON API](https://kno.wled.ge/interfa
 
 | Parameter | Busy (Thinking) | Done (Idle) | Error |
 |---|---|---|---|
-| `fx` (effect) | `2` (Breathe) | `0` (Solid) | `1` (Blink) |
-| `sx` (speed) | `80` | - | `200` |
-| `ix` (intensity) | `100` | - | - |
-| `col` (color) | `[0,255,0]` 🟢 | `[255,255,255]` ⚪ | `[255,0,0]` 🔴 |
+| `fx` (effect) | `9` (Rainbow) | `0` (Solid) | `1` (Blink) |
+| `sx` (speed) | `128` | - | `200` |
+| `ix` (intensity) | `128` | - | - |
+| `col` (color) | *(ignored; Rainbow draws its own colors)* 🌈 | `[255,255,255]` ⚪ | `[255,0,0]` 🔴 |
 
 ---
 

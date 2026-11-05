@@ -9,13 +9,20 @@
 #   auto-reconnects the adapter, disables USB Selective Suspend, and removes
 #   rogue default gateway routes — making the setup fully self-healing.
 #
-# Usage: .\wled-status.ps1 -Status "busy"   → breathing green (thinking)
-#        .\wled-status.ps1 -Status "done"    → solid white     (idle)
-#        .\wled-status.ps1 -Status "error"   → blinking red
+# Usage: .\wled-status.ps1 -Status "busy"    → rotating rainbow (thinking); clears error
+#        .\wled-status.ps1 -Status "error"   → blinking red (tool failed / error); sticky
+#        .\wled-status.ps1 -Status "tool"    → postToolUse for shell commands: red if
+#                                              the command exited non-zero, else back
+#                                              to rainbow (only if red is showing)
+#        .\wled-status.ps1 -Status "done"    → solid white (idle), unless red is showing
+#        .\wled-status.ps1 -Status "reset"   → solid white (session ended); clears error
 #        .\wled-status.ps1 -Color 255,128,0  → custom RGB
+#
+# "Sticky" red: an error leaves a marker file so the Stop hook keeps the lamp
+# red instead of turning it white while something still needs fixing.
 
 param(
-    [ValidateSet("busy", "done", "error")]
+    [ValidateSet("busy", "done", "error", "tool", "recover", "reset")]
     [string]$Status,
     [int[]]$Color,
     [string]$WledHost = $($env:WLED_HOST ?? "4.3.2.1"),
@@ -24,9 +31,31 @@ param(
     [string]$WledSSID = $($env:WLED_SSID ?? "WLED-AP")
 )
 
-# Drain stdin if called as a hook (hooks pipe JSON via stdin)
-if (-not [Console]::IsInputRedirected) { } else {
-    try { [Console]::In.ReadToEnd() | Out-Null } catch { }
+# Hooks pipe event JSON via stdin. "tool" inspects it; others just drain it.
+$hookInput = ""
+if ([Console]::IsInputRedirected) {
+    try { $hookInput = [Console]::In.ReadToEnd() } catch { }
+}
+if ($Status -eq "tool") {
+    # Copilot CLI reports a non-zero shell exit as resultType "success"; the
+    # failure only shows in toolTelemetry (shell_error_category / exit_code).
+    $Status = if ($hookInput -match '"shell_error_category"\s*:\s*"command_nonzero_exit"|"exit_code"\s*:\s*-?[1-9]') { "error" } else { "recover" }
+}
+
+# --- Sticky error state ---
+if ($Status) {
+    $errorFlag = Join-Path ([IO.Path]::GetTempPath()) ("wled-octolamp-error-" + ($WledHost -replace '[^A-Za-z0-9.-]', '_'))
+    switch ($Status) {
+        { $_ -in "busy", "reset" } { Remove-Item -LiteralPath $errorFlag -Force -ErrorAction SilentlyContinue }
+        "error" { try { New-Item -ItemType File -Path $errorFlag -Force | Out-Null } catch { } }
+        "recover" {
+            if (-not (Test-Path -LiteralPath $errorFlag)) { exit 0 }  # Nothing to recover from
+            Remove-Item -LiteralPath $errorFlag -Force -ErrorAction SilentlyContinue
+            $Status = "busy"
+        }
+        "done" { if (Test-Path -LiteralPath $errorFlag) { exit 0 } }  # Keep red until fixed
+    }
+    if ($Status -eq "reset") { $Status = "done" }
 }
 
 # --- Dedicated-adapter mode (only when Interface is set) ---
@@ -81,7 +110,7 @@ if ($Interface) {
 
 # --- Build the WLED JSON API payload ---
 $colors = @{
-    busy  = @(0, 255, 0)    # green
+    busy  = @(255, 0, 0)     # unused by Rainbow, which draws its own colors
     done  = @(255, 255, 255) # white
     error = @(255, 0, 0)     # red
 }
@@ -89,7 +118,7 @@ $colors = @{
 $rgb = if ($Color) { $Color } else { $colors[$Status] }
 
 $effects = @{
-    busy  = @{ fx = 2; sx = 80; ix = 100; pal = 0 }  # Breathe effect
+    busy  = @{ fx = 9; sx = 128; ix = 128; pal = 0 } # Rainbow effect
     done  = @{ fx = 0; pal = 0 }                       # Solid
     error = @{ fx = 1; sx = 200; pal = 0 }             # Blink effect
 }

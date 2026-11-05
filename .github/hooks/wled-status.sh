@@ -9,17 +9,50 @@
 #   adapter connected to the WLED access point). When set, the script also
 #   performs best-effort route hygiene to prevent traffic hijacking.
 #
-# Usage: ./wled-status.sh busy   → breathing green (thinking)
-#        ./wled-status.sh done   → solid white     (idle)
-#        ./wled-status.sh error  → blinking red
+# Usage: ./wled-status.sh busy    → rotating rainbow (thinking); clears error
+#        ./wled-status.sh error   → blinking red (tool failed / error); sticky
+#        ./wled-status.sh tool    → postToolUse for shell commands: red if the
+#                                   command exited non-zero, else back to
+#                                   rainbow (only if red is showing)
+#        ./wled-status.sh done    → solid white (idle), unless red is showing
+#        ./wled-status.sh reset   → solid white (session ended); clears error
+#
+# "Sticky" red: an error leaves a marker file so the Stop hook keeps the lamp
+# red instead of turning it white while something still needs fixing.
 
 STATUS="${1:-done}"
 WLED_HOST="${WLED_HOST:-4.3.2.1}"
 BRIGHTNESS="${WLED_BRIGHTNESS:-128}"
 WLED_INTERFACE="${WLED_INTERFACE:-}"
+ERROR_FLAG="${TMPDIR:-/tmp}"
+ERROR_FLAG="${ERROR_FLAG%/}/wled-octolamp-error-${WLED_HOST//[^A-Za-z0-9.-]/_}"
 
-# Drain stdin if called as a hook (hooks pipe JSON via stdin)
-cat > /dev/null 2>&1 &
+# Hooks pipe event JSON via stdin. "tool" inspects it; others just drain it.
+if [ "$STATUS" = "tool" ]; then
+  HOOK_INPUT="$(cat 2>/dev/null)"
+  # Copilot CLI reports a non-zero shell exit as resultType "success"; the
+  # failure only shows in toolTelemetry (shell_error_category / exit_code).
+  if printf '%s' "$HOOK_INPUT" | grep -qE '"shell_error_category"[[:space:]]*:[[:space:]]*"command_nonzero_exit"|"exit_code"[[:space:]]*:[[:space:]]*-?[1-9]'; then
+    STATUS=error
+  else
+    STATUS=recover
+  fi
+else
+  cat > /dev/null 2>&1 &
+fi
+
+# --- Sticky error state ---
+case "$STATUS" in
+  busy|reset) rm -f "$ERROR_FLAG" 2>/dev/null ;;
+  error)      touch "$ERROR_FLAG" 2>/dev/null ;;
+  recover)
+    [ -e "$ERROR_FLAG" ] || exit 0   # Nothing to recover from; leave lamp alone
+    rm -f "$ERROR_FLAG" 2>/dev/null
+    STATUS=busy ;;
+  *)
+    [ -e "$ERROR_FLAG" ] && exit 0   # Keep red until fixed or next prompt
+    ;;
+esac
 
 # --- Dedicated-adapter mode (only when WLED_INTERFACE is set) ---
 BIND_ARG=""
@@ -47,7 +80,7 @@ fi
 
 # --- Build the WLED JSON API payload ---
 case "$STATUS" in
-  busy)  RGB='[0,255,0]'; FX=2; SX=80; IX=100; PAL=0 ;;   # Breathe
+  busy)  RGB='[255,0,0]'; FX=9; SX=128; IX=128; PAL=0 ;; # Rainbow
   error) RGB='[255,0,0]'; FX=1; SX=200; IX=128; PAL=0 ;;  # Blink
   *)     RGB='[255,255,255]'; FX=0; SX=128; IX=128; PAL=0 ;;  # Solid
 esac
