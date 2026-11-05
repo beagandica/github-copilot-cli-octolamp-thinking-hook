@@ -20,6 +20,10 @@
 #
 # "Sticky" red: an error leaves a marker file so the Stop hook keeps the lamp
 # red instead of turning it white while something still needs fixing.
+#
+# Mode switch: WLED_SOURCE says which assistant fired the hook (copilot by
+# default, claude for Claude Code). If the mode file (see mode.ps1) names a
+# different assistant, or "off", the hook exits without touching the lamp.
 
 param(
     [ValidateSet("busy", "done", "error", "tool", "recover", "reset")]
@@ -36,13 +40,35 @@ $hookInput = ""
 if ([Console]::IsInputRedirected) {
     try { $hookInput = [Console]::In.ReadToEnd() } catch { }
 }
+$source = if ($env:WLED_SOURCE) { $env:WLED_SOURCE } else { "copilot" }
+$modeFile = if ($env:OCTOLAMP_MODE_FILE) { $env:OCTOLAMP_MODE_FILE } else {
+    $configHome = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } else { Join-Path $HOME ".config" }
+    Join-Path (Join-Path $configHome "octolamp") "mode"
+}
+$mode = "both"
+if (Test-Path -LiteralPath $modeFile) {
+    try { $mode = (Get-Content -LiteralPath $modeFile -Raw).Trim() } catch { }
+}
+
+function Write-DebugLog([string]$Message) {
+    if ($env:WLED_DEBUG_LOG) {
+        try { Add-Content -LiteralPath $env:WLED_DEBUG_LOG -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') [$source] $Message $hookInput" } catch { }
+    }
+}
+
+# --- Mode switch: only the selected assistant drives the lamp ---
+if ($Status -and $mode -and $mode -ne "both" -and $mode -ne $source) {
+    Write-DebugLog "$Status -> skipped (mode=$mode)"
+    exit 0
+}
+
 if ($Status -eq "tool") {
     # Copilot CLI reports a non-zero shell exit as resultType "success"; the
     # failure only shows in toolTelemetry (shell_error_category / exit_code).
     $Status = if ($hookInput -match '"shell_error_category"\s*:\s*"command_nonzero_exit"|"exit_code"\s*:\s*-?[1-9]|completed with exit code -?[1-9]') { "error" } else { "recover" }
-    if ($env:WLED_DEBUG_LOG) {
-        try { Add-Content -LiteralPath $env:WLED_DEBUG_LOG -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') tool -> $Status $hookInput" } catch { }
-    }
+    Write-DebugLog "tool -> $Status"
+} elseif ($Status) {
+    Write-DebugLog $Status
 }
 
 # --- Sticky error state ---

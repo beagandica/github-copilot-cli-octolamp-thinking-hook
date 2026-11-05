@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 $repo = Split-Path $PSScriptRoot -Parent
 $temp = Join-Path ([IO.Path]::GetTempPath()) ("wled-hook-test-" + [guid]::NewGuid())
 $savedEnv = @{}
-foreach ($name in "COPILOT_HOME", "WLED_HOST", "WLED_INTERFACE", "WLED_SSID", "WLED_BRIGHTNESS", "WLED_TEST_STATE") {
+foreach ($name in "COPILOT_HOME", "WLED_HOST", "WLED_INTERFACE", "WLED_SSID", "WLED_BRIGHTNESS", "WLED_TEST_STATE", "WLED_SOURCE", "WLED_DEBUG_LOG", "OCTOLAMP_MODE_FILE") {
     $savedEnv[$name] = [Environment]::GetEnvironmentVariable($name)
     [Environment]::SetEnvironmentVariable($name, $null)
 }
@@ -70,6 +70,8 @@ function Test-FirstPrompt($Config, [bool]$UseBash, [string]$Name) {
 try {
     New-Item -ItemType Directory -Path $temp | Out-Null
     $env:WLED_TEST_STATE = Join-Path $temp "lamp.json"
+    # Ignore the user's real mode switch (a missing file means "both").
+    $env:OCTOLAMP_MODE_FILE = Join-Path $temp "octolamp-mode"
     $config = Get-Content -LiteralPath (Join-Path $repo ".github\hooks\wled-hooks.json") -Raw | ConvertFrom-Json
     Test-FirstPrompt $config $false "Repository PowerShell hooks"
     Test-FirstPrompt $config $true "Repository Bash hooks"

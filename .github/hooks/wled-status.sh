@@ -19,6 +19,10 @@
 #
 # "Sticky" red: an error leaves a marker file so the Stop hook keeps the lamp
 # red instead of turning it white while something still needs fixing.
+#
+# Mode switch: WLED_SOURCE says which assistant fired the hook (copilot by
+# default, claude for Claude Code). If the mode file (see mode.sh) names a
+# different assistant, or "off", the hook exits without touching the lamp.
 
 STATUS="${1:-done}"
 WLED_HOST="${WLED_HOST:-4.3.2.1}"
@@ -26,10 +30,34 @@ BRIGHTNESS="${WLED_BRIGHTNESS:-128}"
 WLED_INTERFACE="${WLED_INTERFACE:-}"
 ERROR_FLAG="${TMPDIR:-/tmp}"
 ERROR_FLAG="${ERROR_FLAG%/}/wled-octolamp-error-${WLED_HOST//[^A-Za-z0-9.-]/_}"
+WLED_SOURCE="${WLED_SOURCE:-copilot}"
+MODE_FILE="${OCTOLAMP_MODE_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/octolamp/mode}"
+MODE="both"
+if [ -r "$MODE_FILE" ]; then
+  MODE="$(tr -d '[:space:]' < "$MODE_FILE" 2>/dev/null)"
+fi
 
-# Hooks pipe event JSON via stdin. "tool" inspects it; others just drain it.
-if [ "$STATUS" = "tool" ]; then
+debug_log() {
+  if [ -n "${WLED_DEBUG_LOG:-}" ]; then
+    printf '%s [%s] %s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$WLED_SOURCE" "$1" "${HOOK_INPUT:-}" >> "$WLED_DEBUG_LOG" 2>/dev/null
+  fi
+}
+
+# Hooks pipe event JSON via stdin. Read it when needed; otherwise just drain it.
+HOOK_INPUT=""
+if [ "$STATUS" = "tool" ] || [ -n "${WLED_DEBUG_LOG:-}" ]; then
   HOOK_INPUT="$(cat 2>/dev/null)"
+else
+  cat > /dev/null 2>&1 &
+fi
+
+# --- Mode switch: only the selected assistant drives the lamp ---
+case "$MODE" in
+  ""|both|"$WLED_SOURCE") ;;
+  *) debug_log "$STATUS -> skipped (mode=$MODE)"; exit 0 ;;
+esac
+
+if [ "$STATUS" = "tool" ]; then
   # Copilot CLI reports a non-zero shell exit as resultType "success"; the
   # failure only shows in toolTelemetry (shell_error_category / exit_code).
   # Fallback: the shell tool's text ends with "completed with exit code N".
@@ -38,11 +66,9 @@ if [ "$STATUS" = "tool" ]; then
   else
     STATUS=recover
   fi
-  if [ -n "${WLED_DEBUG_LOG:-}" ]; then
-    printf '%s tool -> %s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$STATUS" "$HOOK_INPUT" >> "$WLED_DEBUG_LOG" 2>/dev/null
-  fi
+  debug_log "tool -> $STATUS"
 else
-  cat > /dev/null 2>&1 &
+  debug_log "$STATUS"
 fi
 
 # --- Sticky error state ---

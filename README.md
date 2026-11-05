@@ -44,6 +44,8 @@ Red is *sticky*: once something fails, `Stop` won't turn the lamp white. Red cle
 
 ### Key Features
 
+- **Works with GitHub Copilot CLI and Claude Code**, with a [mode switch](#-claude-code--mode-switch) so only one drives the lamp at a time
+
 - **System-level hooks** - not dependent on the AI model remembering to call a tool
 - **Cross-platform** - PowerShell (Windows) and Bash (macOS/Linux) scripts
 - **Self-healing** (optional) - auto-reconnects a dedicated WiFi adapter if it drops
@@ -148,6 +150,42 @@ Restart the Copilot CLI process after installation so it reloads the hooks, then
 
 ---
 
+## 🤖 Claude Code + Mode Switch
+
+The same lamp states work with [Claude Code](https://docs.claude.com/en/docs/claude-code/overview), in the terminal and in the VS Code / JetBrains extensions.
+
+### Install the Claude Code hooks (macOS / Linux)
+
+```bash
+WLED_HOST="192.168.1.42" ./install-claude.sh
+```
+
+This copies `wled-status.sh` to `~/.claude/hooks/octolamp/` (or `$CLAUDE_CONFIG_DIR`) and adds hooks to `~/.claude/settings.json`. It backs up the file first, keeps your other settings and hooks, and replaces its own entries when re-run. Requires `python3`. Start a new Claude Code session afterwards.
+
+| Lamp | Claude Code hook |
+|---|---|
+| 🌈 Thinking | `UserPromptSubmit` |
+| 🔴 Command failed (sticky) | `PostToolUseFailure` (matcher `Bash\|PowerShell`) |
+| 🌈 Fixed | `PostToolUse` (matcher `Bash\|PowerShell`) |
+| ⚪ Idle, or 🔴 if still broken | `Stop` |
+| ⚪ Session end (clears red) | `SessionEnd` |
+
+### Choose which assistant drives the lamp
+
+If both assistants are installed, they can overwrite each other's colors. Pick one:
+
+```bash
+./mode.sh claude    # only Claude Code changes the lamp
+./mode.sh copilot   # only Copilot CLI changes the lamp
+./mode.sh both      # either (default when no mode is set)
+./mode.sh off       # neither
+./mode.sh           # show the current mode
+```
+
+On Windows, use `.\mode.ps1 claude` and so on. The switch takes effect on the next hook; no restart needed. Each hook passes `WLED_SOURCE` (`copilot` by default, `claude` from `install-claude.sh`), and the controller exits quietly when the mode names a different assistant. The mode is stored in `~/.config/octolamp/mode` (or `$XDG_CONFIG_HOME/octolamp/mode`; override with `OCTOLAMP_MODE_FILE`).
+
+---
+
 ## ⚙️ Configuration
 
 All settings are controlled via environment variables - no code changes needed.
@@ -159,7 +197,9 @@ The global installers save any `WLED_*` settings below that are set at installat
 | `WLED_BRIGHTNESS` | `128` | LED brightness (0–255) |
 | `WLED_INTERFACE` | *(unset)* | Network interface name for dedicated adapter mode (e.g., `Wi-Fi 2`, `wlan1`) |
 | `WLED_SSID` | `WLED-AP` | WiFi SSID to auto-reconnect to (only used when `WLED_INTERFACE` is set) |
-| `WLED_DEBUG_LOG` | *(unset)* | File path; when set, each shell-command hook logs its decision and input JSON there |
+| `WLED_DEBUG_LOG` | *(unset)* | File path; when set, every hook logs its source, decision and input JSON there |
+| `WLED_SOURCE` | `copilot` | Which assistant fired the hook (`copilot` or `claude`); compared against the [mode switch](#-claude-code--mode-switch) |
+| `OCTOLAMP_MODE_FILE` | `~/.config/octolamp/mode` | Where the mode switch is stored |
 
 ### Simple Setup (WLED on your home network)
 
@@ -400,6 +440,8 @@ github-copilot-cli-octolamp-thinking-hook/
 │   └── hook-lifecycle.ps1       ← No-network lifecycle regression check
 ├── install.ps1                  ← Windows global install script
 ├── install.sh                   ← macOS/Linux global install script
+├── install-claude.sh            ← Claude Code global install script (macOS/Linux)
+├── mode.sh / mode.ps1           ← Switch between Copilot CLI, Claude Code, both, or off
 ├── LICENSE                      ← MIT License
 └── README.md                   ← You are here
 ```
