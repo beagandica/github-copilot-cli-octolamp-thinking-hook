@@ -10,7 +10,7 @@
 #   rogue default gateway routes — making the setup fully self-healing.
 #
 # Usage: .\wled-status.ps1 -Status "busy"    → rotating rainbow (thinking); clears error
-#        .\wled-status.ps1 -Status "error"   → blinking red (tool failed / error); sticky
+#        .\wled-status.ps1 -Status "error"   → solid red (tool failed / error); sticky
 #        .\wled-status.ps1 -Status "tool"    → postToolUse for shell commands: red if
 #                                              the command exited non-zero, else back
 #                                              to rainbow (only if red is showing)
@@ -39,7 +39,10 @@ if ([Console]::IsInputRedirected) {
 if ($Status -eq "tool") {
     # Copilot CLI reports a non-zero shell exit as resultType "success"; the
     # failure only shows in toolTelemetry (shell_error_category / exit_code).
-    $Status = if ($hookInput -match '"shell_error_category"\s*:\s*"command_nonzero_exit"|"exit_code"\s*:\s*-?[1-9]') { "error" } else { "recover" }
+    $Status = if ($hookInput -match '"shell_error_category"\s*:\s*"command_nonzero_exit"|"exit_code"\s*:\s*-?[1-9]|completed with exit code -?[1-9]') { "error" } else { "recover" }
+    if ($env:WLED_DEBUG_LOG) {
+        try { Add-Content -LiteralPath $env:WLED_DEBUG_LOG -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') tool -> $Status $hookInput" } catch { }
+    }
 }
 
 # --- Sticky error state ---
@@ -120,7 +123,7 @@ $rgb = if ($Color) { $Color } else { $colors[$Status] }
 $effects = @{
     busy  = @{ fx = 9; sx = 128; ix = 128; pal = 0 } # Rainbow effect
     done  = @{ fx = 0; pal = 0 }                       # Solid
-    error = @{ fx = 1; sx = 200; pal = 0 }             # Blink effect
+    error = @{ fx = 0; pal = 0 }                       # Solid
 }
 
 $seg = @{}

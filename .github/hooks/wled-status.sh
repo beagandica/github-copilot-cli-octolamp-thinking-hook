@@ -10,7 +10,7 @@
 #   performs best-effort route hygiene to prevent traffic hijacking.
 #
 # Usage: ./wled-status.sh busy    → rotating rainbow (thinking); clears error
-#        ./wled-status.sh error   → blinking red (tool failed / error); sticky
+#        ./wled-status.sh error   → solid red (tool failed / error); sticky
 #        ./wled-status.sh tool    → postToolUse for shell commands: red if the
 #                                   command exited non-zero, else back to
 #                                   rainbow (only if red is showing)
@@ -32,10 +32,14 @@ if [ "$STATUS" = "tool" ]; then
   HOOK_INPUT="$(cat 2>/dev/null)"
   # Copilot CLI reports a non-zero shell exit as resultType "success"; the
   # failure only shows in toolTelemetry (shell_error_category / exit_code).
-  if printf '%s' "$HOOK_INPUT" | grep -qE '"shell_error_category"[[:space:]]*:[[:space:]]*"command_nonzero_exit"|"exit_code"[[:space:]]*:[[:space:]]*-?[1-9]'; then
+  # Fallback: the shell tool's text ends with "completed with exit code N".
+  if printf '%s' "$HOOK_INPUT" | grep -qE '"shell_error_category"[[:space:]]*:[[:space:]]*"command_nonzero_exit"|"exit_code"[[:space:]]*:[[:space:]]*-?[1-9]|completed with exit code -?[1-9]'; then
     STATUS=error
   else
     STATUS=recover
+  fi
+  if [ -n "${WLED_DEBUG_LOG:-}" ]; then
+    printf '%s tool -> %s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$STATUS" "$HOOK_INPUT" >> "$WLED_DEBUG_LOG" 2>/dev/null
   fi
 else
   cat > /dev/null 2>&1 &
@@ -81,7 +85,7 @@ fi
 # --- Build the WLED JSON API payload ---
 case "$STATUS" in
   busy)  RGB='[255,0,0]'; FX=9; SX=128; IX=128; PAL=0 ;; # Rainbow
-  error) RGB='[255,0,0]'; FX=1; SX=200; IX=128; PAL=0 ;;  # Blink
+  error) RGB='[255,0,0]'; FX=0; SX=128; IX=128; PAL=0 ;;  # Solid
   *)     RGB='[255,255,255]'; FX=0; SX=128; IX=128; PAL=0 ;;  # Solid
 esac
 

@@ -1,6 +1,6 @@
 # 🐙💡 GitHub Copilot CLI Octolamp Thinking Hook
 
-Turn your [WLED](https://kno.wled.ge/)-powered [Octolamp](https://github.com/martinwoodward/octolamp) into a real-time status light for [GitHub Copilot CLI](https://docs.github.com/copilot/concepts/agents/about-copilot-cli). When Copilot is thinking, a rainbow spins around the lamp. When it's idle, solid white. If a command fails or something breaks, it blinks red until it's fixed.
+Turn your [WLED](https://kno.wled.ge/)-powered [Octolamp](https://github.com/martinwoodward/octolamp) into a real-time status light for [GitHub Copilot CLI](https://docs.github.com/copilot/concepts/agents/about-copilot-cli). When Copilot is thinking, a rainbow spins around the lamp. When it's idle, solid white. If a command fails or something breaks, it turns solid red until it's fixed.
 
 No model-level prompting tricks - this uses **Copilot CLI's native hooks system**, which fires at session lifecycle events.
 
@@ -33,9 +33,9 @@ The session walks through the build, how Copilot CLI hooks work under the hood, 
 | Status | Light Effect | Trigger |
 |---|---|---|
 | **Thinking** | 🌈 Rotating rainbow | `userPromptSubmitted` - you hit enter |
-| **Needs fixing** | 🔴 Blinking red (stays red) | `postToolUseFailure` - a tool or command failed |
-| **Error** | 🔴 Blinking red (stays red) | `errorOccurred` - Copilot itself hit an error |
-| **Command failed** | 🔴 Blinking red (stays red) | `postToolUse` - a `bash`/`powershell` command exited non-zero |
+| **Needs fixing** | 🔴 Solid red (stays red) | `postToolUseFailure` - a tool or command failed |
+| **Error** | 🔴 Solid red (stays red) | `errorOccurred` - Copilot itself hit an error |
+| **Command failed** | 🔴 Solid red (stays red) | `postToolUse` - a `bash`/`powershell` command exited non-zero |
 | **Fixed** | 🌈 Back to rainbow | `postToolUse` - a later `bash`/`powershell` command succeeds |
 | **Idle** | ⚪ Solid white, or 🔴 if still broken | `Stop` - agent finishes responding |
 | **Session end** | ⚪ Solid white (clears red) | `sessionEnd` - session closes |
@@ -159,6 +159,7 @@ The global installers save any `WLED_*` settings below that are set at installat
 | `WLED_BRIGHTNESS` | `128` | LED brightness (0–255) |
 | `WLED_INTERFACE` | *(unset)* | Network interface name for dedicated adapter mode (e.g., `Wi-Fi 2`, `wlan1`) |
 | `WLED_SSID` | `WLED-AP` | WiFi SSID to auto-reconnect to (only used when `WLED_INTERFACE` is set) |
+| `WLED_DEBUG_LOG` | *(unset)* | File path; when set, each shell-command hook logs its decision and input JSON there |
 
 ### Simple Setup (WLED on your home network)
 
@@ -326,11 +327,11 @@ After setup, tell me to restart Copilot CLI so the hooks load.
 The hook configuration maps lifecycle events to the status scripts:
 
 - **`userPromptSubmitted`** → fires when you press enter → 🌈 rotating rainbow
-- **`postToolUseFailure`** → fires when a tool fails → 🔴 blinking red (sticky)
+- **`postToolUseFailure`** → fires when a tool fails → 🔴 solid red (sticky)
 - **`postToolUse`** (matcher `bash|powershell`) → fires after every shell command → 🔴 if it exited non-zero, otherwise 🌈 back to rainbow (only if red was showing). Copilot CLI reports a non-zero exit as `resultType: "success"`, so the script checks `toolResult.toolTelemetry` (`shell_error_category: "command_nonzero_exit"` / `exit_code`) instead.
 - **`Stop`** → fires when the agent finishes responding → ⚪ solid white, unless red is showing
 - **`sessionEnd`** → fires when the session closes → ⚪ solid white, clears red
-- **`errorOccurred`** → fires on any agent error → 🔴 blinking red (sticky)
+- **`errorOccurred`** → fires on any agent error → 🔴 solid red (sticky)
 
 Hooks receive JSON input via stdin. The status scripts drain this input and ignore it - they only care about which status to set.
 
@@ -417,8 +418,8 @@ The scripts communicate with WLED via its [JSON API](https://kno.wled.ge/interfa
 
 | Parameter | Busy (Thinking) | Done (Idle) | Error |
 |---|---|---|---|
-| `fx` (effect) | `9` (Rainbow) | `0` (Solid) | `1` (Blink) |
-| `sx` (speed) | `128` | - | `200` |
+| `fx` (effect) | `9` (Rainbow) | `0` (Solid) | `0` (Solid) |
+| `sx` (speed) | `128` | - | - |
 | `ix` (intensity) | `128` | - | - |
 | `col` (color) | *(ignored; Rainbow draws its own colors)* 🌈 | `[255,255,255]` ⚪ | `[255,0,0]` 🔴 |
 

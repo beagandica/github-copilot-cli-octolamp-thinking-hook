@@ -42,7 +42,7 @@ PS1_PATH="$HOOKS_DIR/wled-status.ps1"
 PS1_PATH="$(json_escape "${PS1_PATH//\'/\'\'}")"
 
 HOOK_ENV=""
-for name in WLED_HOST WLED_BRIGHTNESS WLED_INTERFACE WLED_SSID; do
+for name in WLED_HOST WLED_BRIGHTNESS WLED_INTERFACE WLED_SSID WLED_DEBUG_LOG; do
     value="${!name:-}"
     if [ -n "$value" ]; then
         if [ -n "$HOOK_ENV" ]; then HOOK_ENV+=", "; fi

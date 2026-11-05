@@ -31,7 +31,7 @@ $ps1CommandPath = "'" + $ps1Path.Replace("'", "''") + "'"
 $shCommandPath = "'" + $shPath.Replace("'", "'\''") + "'"
 
 $hookEnv = @{}
-foreach ($name in "WLED_HOST", "WLED_BRIGHTNESS", "WLED_INTERFACE", "WLED_SSID") {
+foreach ($name in "WLED_HOST", "WLED_BRIGHTNESS", "WLED_INTERFACE", "WLED_SSID", "WLED_DEBUG_LOG") {
     $value = [Environment]::GetEnvironmentVariable($name)
     if ($value) { $hookEnv[$name] = $value }
 }
